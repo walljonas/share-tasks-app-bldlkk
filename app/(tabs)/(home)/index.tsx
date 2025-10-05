@@ -1,6 +1,10 @@
 
-import React, { useState } from "react";
+import { GlassView } from "expo-glass-effect";
+import { useTasks } from "@/hooks/useTasks";
+import { useTheme } from "@react-navigation/native";
 import { Stack } from "expo-router";
+import { IconSymbol } from "@/components/IconSymbol";
+import InvitePartnerModal from "@/components/InvitePartnerModal";
 import { 
   ScrollView, 
   StyleSheet, 
@@ -11,31 +15,26 @@ import {
   Modal,
   RefreshControl,
 } from "react-native";
-import { IconSymbol } from "@/components/IconSymbol";
-import { GlassView } from "expo-glass-effect";
-import { useTheme } from "@react-navigation/native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useTasks } from "@/hooks/useTasks";
-import TaskCard from "@/components/TaskCard";
 import CreateTaskModal from "@/components/CreateTaskModal";
-import InvitePartnerModal from "@/components/InvitePartnerModal";
+import React, { useState } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import TaskCard from "@/components/TaskCard";
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const {
-    tasks,
+  const { 
+    tasks, 
     partners,
-    loading,
-    createTask,
-    updateTask,
+    loading, 
+    createTask, 
+    updateTask, 
     updateSubTask,
-    invitePartner,
-    shareTaskWithPartner,
+    invitePartner 
   } = useTasks();
-
-  const [showCreateTask, setShowCreateTask] = useState(false);
-  const [showInvitePartner, setShowInvitePartner] = useState(false);
+  
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleToggleTask = async (taskId: string) => {
@@ -47,247 +46,207 @@ export default function HomeScreen() {
 
   const handleToggleSubTask = async (taskId: string, subTaskId: string) => {
     const task = tasks.find(t => t.id === taskId);
-    const subTask = task?.subTasks.find(st => st.id === subTaskId);
-    if (subTask) {
-      await updateSubTask(taskId, subTaskId, { completed: !subTask.completed });
+    if (task) {
+      const subTask = task.subTasks.find(st => st.id === subTaskId);
+      if (subTask) {
+        await updateSubTask(taskId, subTaskId, { completed: !subTask.completed });
+      }
     }
   };
 
   const handleCreateTask = async (taskData: any) => {
     await createTask(taskData);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowCreateModal(false);
   };
 
   const handleInvitePartner = async (email: string, name: string) => {
     await invitePartner(email, name);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowInviteModal(false);
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
     // Simulate refresh delay
-    setTimeout(() => setRefreshing(false), 1000);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
   };
-
-  const completedTasks = tasks.filter(task => task.completed);
-  const pendingTasks = tasks.filter(task => !task.completed);
-  const acceptedPartners = partners.filter(p => p.status === 'accepted');
-  const checklistTasks = tasks.filter(task => task.isChecklist);
 
   const renderHeaderRight = () => (
     <View style={styles.headerButtons}>
       <Pressable
-        onPress={() => setShowInvitePartner(true)}
-        style={styles.headerButton}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowInviteModal(true);
+        }}
+        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
       >
-        <IconSymbol name="person.badge.plus" color={theme.colors.primary} size={20} />
+        <IconSymbol name="person.badge.plus" size={16} color="white" />
       </Pressable>
       <Pressable
-        onPress={() => setShowCreateTask(true)}
-        style={styles.headerButton}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowCreateModal(true);
+        }}
+        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
       >
-        <IconSymbol name="plus" color={theme.colors.primary} size={20} />
+        <IconSymbol name="plus" size={16} color="white" />
       </Pressable>
     </View>
   );
 
-  const renderStats = () => (
-    <GlassView
-      style={[
-        styles.statsContainer,
-        Platform.OS !== 'ios' && {
-          backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-        },
-      ]}
-      glassEffectStyle="regular"
-    >
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
-          {pendingTasks.length}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-          Active Tasks
-        </Text>
+  const renderStats = () => {
+    const completedTasks = tasks.filter(task => task.completed).length;
+    const totalTasks = tasks.length;
+    const pendingTasks = totalTasks - completedTasks;
+    const sharedTasks = tasks.filter(task => task.sharedWith.length > 0).length;
+    const assignedTasks = tasks.filter(task => task.assignedTo).length;
+
+    return (
+      <View style={styles.statsContainer}>
+        <GlassView style={styles.statCard} glassEffectStyle="regular">
+          <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
+            {totalTasks}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+            Total Tasks
+          </Text>
+        </GlassView>
+
+        <GlassView style={styles.statCard} glassEffectStyle="regular">
+          <Text style={[styles.statNumber, { color: '#34C759' }]}>
+            {completedTasks}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+            Completed
+          </Text>
+        </GlassView>
+
+        <GlassView style={styles.statCard} glassEffectStyle="regular">
+          <Text style={[styles.statNumber, { color: '#FF9500' }]}>
+            {pendingTasks}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+            Pending
+          </Text>
+        </GlassView>
+
+        <GlassView style={styles.statCard} glassEffectStyle="regular">
+          <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
+            {sharedTasks}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+            Shared
+          </Text>
+        </GlassView>
+
+        <GlassView style={styles.statCard} glassEffectStyle="regular">
+          <Text style={[styles.statNumber, { color: '#FF3B30' }]}>
+            {assignedTasks}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+            Assigned
+          </Text>
+        </GlassView>
       </View>
-      
-      <View style={styles.statDivider} />
-      
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: '#34C759' }]}>
-          {completedTasks.length}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-          Completed
-        </Text>
-      </View>
-      
-      <View style={styles.statDivider} />
-      
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: '#FF9500' }]}>
-          {checklistTasks.length}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-          Checklists
-        </Text>
-      </View>
-      
-      <View style={styles.statDivider} />
-      
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: '#007AFF' }]}>
-          {acceptedPartners.length}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-          Partners
-        </Text>
-      </View>
-    </GlassView>
-  );
+    );
+  };
 
   return (
-    <>
-      {Platform.OS === 'ios' && (
-        <Stack.Screen
-          options={{
-            title: "Loop Tasks",
-            headerRight: renderHeaderRight,
-          }}
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Stack.Screen
+        options={{
+          title: "Tasks",
+          headerRight: renderHeaderRight,
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+          },
+          headerTintColor: theme.colors.text,
+          headerTitleStyle: {
+            fontWeight: '600',
+          },
+        }}
+      />
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        {renderStats()}
+
+        <View style={styles.tasksSection}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Your Tasks
+          </Text>
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+                Loading tasks...
+              </Text>
+            </View>
+          ) : tasks.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <IconSymbol name="checkmark.circle" size={48} color={theme.colors.text} />
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                No tasks yet
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+                Create your first task to get started
+              </Text>
+            </View>
+          ) : (
+            tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                partners={partners}
+                onToggleComplete={handleToggleTask}
+                onToggleSubTask={handleToggleSubTask}
+                onPress={() => {
+                  console.log('Task pressed:', task.title);
+                  // TODO: Navigate to task detail
+                }}
+                onShare={() => {
+                  console.log('Share task:', task.title);
+                  // TODO: Implement share functionality
+                }}
+              />
+            ))
+          )}
+        </View>
+      </ScrollView>
+
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <CreateTaskModal
+          onClose={() => setShowCreateModal(false)}
+          onCreateTask={handleCreateTask}
+          partners={partners.filter(p => p.status === 'accepted')}
         />
-      )}
-      
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[
-            styles.content,
-            Platform.OS !== 'ios' && styles.contentWithTabBar,
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.colors.primary}
-            />
-          }
-        >
-          {/* Header for non-iOS platforms */}
-          {Platform.OS !== 'ios' && (
-            <View style={styles.header}>
-              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-                Loop Tasks
-              </Text>
-              {renderHeaderRight()}
-            </View>
-          )}
+      </Modal>
 
-          {/* Stats */}
-          {renderStats()}
-
-          {/* Welcome message for new users */}
-          {tasks.length === 0 && (
-            <GlassView
-              style={[
-                styles.welcomeContainer,
-                Platform.OS !== 'ios' && {
-                  backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                },
-              ]}
-              glassEffectStyle="regular"
-            >
-              <IconSymbol name="list.bullet.clipboard" size={48} color={theme.colors.primary} />
-              <Text style={[styles.welcomeTitle, { color: theme.colors.text }]}>
-                Welcome to Loop Tasks
-              </Text>
-              <Text style={[styles.welcomeText, { color: theme.dark ? '#98989D' : '#666' }]}>
-                Create your first task, invite partners to collaborate, or set up checklists to break down complex projects.
-              </Text>
-              <View style={styles.welcomeButtons}>
-                <Pressable
-                  onPress={() => setShowCreateTask(true)}
-                  style={[styles.welcomeButton, { backgroundColor: theme.colors.primary }]}
-                >
-                  <IconSymbol name="plus" size={16} color="white" />
-                  <Text style={styles.welcomeButtonText}>Create Task</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setShowInvitePartner(true)}
-                  style={[styles.welcomeButton, styles.welcomeButtonSecondary, { borderColor: theme.colors.primary }]}
-                >
-                  <IconSymbol name="person.badge.plus" size={16} color={theme.colors.primary} />
-                  <Text style={[styles.welcomeButtonText, { color: theme.colors.primary }]}>
-                    Invite Partner
-                  </Text>
-                </Pressable>
-              </View>
-            </GlassView>
-          )}
-
-          {/* Active Tasks */}
-          {pendingTasks.length > 0 && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Active Tasks ({pendingTasks.length})
-              </Text>
-              {pendingTasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onToggleComplete={handleToggleTask}
-                  onToggleSubTask={handleToggleSubTask}
-                  onPress={() => console.log('Task pressed:', task.id)}
-                  onShare={() => console.log('Share task:', task.id)}
-                />
-              ))}
-            </View>
-          )}
-
-          {/* Completed Tasks */}
-          {completedTasks.length > 0 && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Completed ({completedTasks.length})
-              </Text>
-              {completedTasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onToggleComplete={handleToggleTask}
-                  onToggleSubTask={handleToggleSubTask}
-                  onPress={() => console.log('Task pressed:', task.id)}
-                />
-              ))}
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Create Task Modal */}
-        <Modal
-          visible={showCreateTask}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <CreateTaskModal
-            onClose={() => setShowCreateTask(false)}
-            onCreateTask={handleCreateTask}
-            partners={partners}
-          />
-        </Modal>
-
-        {/* Invite Partner Modal */}
-        <Modal
-          visible={showInvitePartner}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <InvitePartnerModal
-            onClose={() => setShowInvitePartner(false)}
-            onInvite={handleInvitePartner}
-          />
-        </Modal>
-      </SafeAreaView>
-    </>
+      <Modal
+        visible={showInviteModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <InvitePartnerModal
+          onClose={() => setShowInviteModal(false)}
+          onInvite={handleInvitePartner}
+        />
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -298,38 +257,34 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  content: {
+  scrollContent: {
     padding: 16,
-  },
-  contentWithTabBar: {
-    paddingBottom: 100,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+    paddingBottom: 100, // Space for floating tab bar
   },
   headerButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   headerButton: {
-    padding: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statsContainer: {
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
   },
-  statItem: {
+  statCard: {
+    flex: 1,
+    minWidth: 80,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
+    backgroundColor: Platform.OS === 'ios' ? undefined : 'rgba(255,255,255,0.1)',
   },
   statNumber: {
     fontSize: 24,
@@ -338,59 +293,38 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  welcomeContainer: {
-    borderRadius: 12,
-    padding: 32,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  welcomeTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: 16,
-    marginBottom: 8,
+    fontWeight: '500',
     textAlign: 'center',
   },
-  welcomeText: {
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  welcomeButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  welcomeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  welcomeButtonSecondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-  },
-  welcomeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
-  },
-  section: {
-    marginBottom: 24,
+  tasksSection: {
+    flex: 1,
   },
   sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  loadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

@@ -1,5 +1,16 @@
 
+import { IconSymbol } from '@/components/IconSymbol';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { useTasks } from '@/hooks/useTasks';
+import { Stack } from 'expo-router';
+import { GlassView } from 'expo-glass-effect';
+import CreateTaskForPartnerModal from '@/components/CreateTaskForPartnerModal';
+import InvitePartnerModal from '@/components/InvitePartnerModal';
+import PartnerCard from '@/components/PartnerCard';
+import TaskCard from '@/components/TaskCard';
+import { useTheme } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -11,41 +22,32 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { GlassView } from 'expo-glass-effect';
-import { IconSymbol } from '@/components/IconSymbol';
-import { useTasks } from '@/hooks/useTasks';
-import PartnerCard from '@/components/PartnerCard';
-import InvitePartnerModal from '@/components/InvitePartnerModal';
-import CreateTaskForPartnerModal from '@/components/CreateTaskForPartnerModal';
-import * as Haptics from 'expo-haptics';
 
 export default function PartnersScreen() {
   const theme = useTheme();
-  const {
-    partners,
+  const { 
     tasks,
+    partners, 
     loading,
     invitePartner,
     updatePartnerStatus,
     createTaskForPartner,
+    updateTask,
+    updateSubTask,
   } = useTasks();
-
+  
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
-  const [selectedPartner, setSelectedPartner] = useState<string | null>(null);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleInvitePartner = async (email: string, name: string) => {
     await invitePartner(email, name);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowInviteModal(false);
   };
 
   const handleAcceptPartner = async (partnerId: string) => {
     await updatePartnerStatus(partnerId, 'accepted');
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleDeclinePartner = async (partnerId: string) => {
@@ -54,263 +56,242 @@ export default function PartnersScreen() {
       'Are you sure you want to decline this partner invitation?',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Decline',
+        { 
+          text: 'Decline', 
           style: 'destructive',
-          onPress: async () => {
-            await updatePartnerStatus(partnerId, 'declined');
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          },
+          onPress: () => updatePartnerStatus(partnerId, 'declined')
         },
       ]
     );
   };
 
   const handleCreateTaskForPartner = async (taskData: any) => {
-    if (selectedPartner) {
-      await createTaskForPartner(selectedPartner, taskData);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSelectedPartner(null);
+    if (selectedPartnerId) {
+      await createTaskForPartner(selectedPartnerId, taskData);
+      setShowCreateTaskModal(false);
+      setSelectedPartnerId(null);
     }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    // Simulate refresh delay
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
   };
-
-  const pendingPartners = partners.filter(p => p.status === 'pending');
-  const acceptedPartners = partners.filter(p => p.status === 'accepted');
-  const declinedPartners = partners.filter(p => p.status === 'declined');
 
   const getTasksForPartner = (partnerId: string) => {
     return tasks.filter(task => 
       task.assignedTo === partnerId || 
-      task.sharedWith.includes(partnerId) ||
-      task.collaborators.includes(partnerId)
+      task.sharedWith.includes(partnerId)
     );
+  };
+
+  const handleToggleTask = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      await updateTask(taskId, { completed: !task.completed });
+    }
+  };
+
+  const handleToggleSubTask = async (taskId: string, subTaskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      const subTask = task.subTasks.find(st => st.id === subTaskId);
+      if (subTask) {
+        await updateSubTask(taskId, subTaskId, { completed: !subTask.completed });
+      }
+    }
   };
 
   const renderHeaderRight = () => (
     <Pressable
-      onPress={() => setShowInviteModal(true)}
-      style={styles.headerButton}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setShowInviteModal(true);
+      }}
+      style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
     >
-      <IconSymbol name="person.badge.plus" color={theme.colors.primary} size={20} />
+      <IconSymbol name="person.badge.plus" size={16} color="white" />
     </Pressable>
   );
 
-  const renderStats = () => (
-    <GlassView
-      style={[
-        styles.statsContainer,
-        Platform.OS !== 'ios' && {
-          backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-        },
-      ]}
-      glassEffectStyle="regular"
-    >
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
-          {acceptedPartners.length}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-          Active Partners
-        </Text>
+  const renderStats = () => {
+    const acceptedPartners = partners.filter(p => p.status === 'accepted').length;
+    const pendingPartners = partners.filter(p => p.status === 'pending').length;
+    const sharedTasks = tasks.filter(task => task.sharedWith.length > 0).length;
+    const assignedTasks = tasks.filter(task => task.assignedTo).length;
+
+    return (
+      <View style={styles.statsContainer}>
+        <GlassView style={styles.statCard} glassEffectStyle="regular">
+          <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
+            {acceptedPartners}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+            Active Partners
+          </Text>
+        </GlassView>
+
+        <GlassView style={styles.statCard} glassEffectStyle="regular">
+          <Text style={[styles.statNumber, { color: '#FF9500' }]}>
+            {pendingPartners}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+            Pending
+          </Text>
+        </GlassView>
+
+        <GlassView style={styles.statCard} glassEffectStyle="regular">
+          <Text style={[styles.statNumber, { color: '#34C759' }]}>
+            {sharedTasks}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+            Shared Tasks
+          </Text>
+        </GlassView>
+
+        <GlassView style={styles.statCard} glassEffectStyle="regular">
+          <Text style={[styles.statNumber, { color: '#FF3B30' }]}>
+            {assignedTasks}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+            Assigned Tasks
+          </Text>
+        </GlassView>
       </View>
-      
-      <View style={styles.statDivider} />
-      
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: '#FF9500' }]}>
-          {pendingPartners.length}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-          Pending
-        </Text>
-      </View>
-      
-      <View style={styles.statDivider} />
-      
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: '#34C759' }]}>
-          {tasks.filter(t => t.sharedWith.length > 0).length}
-        </Text>
-        <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-          Shared Tasks
-        </Text>
-      </View>
-    </GlassView>
-  );
+    );
+  };
 
   return (
-    <>
-      {Platform.OS === 'ios' && (
-        <Stack.Screen
-          options={{
-            title: "Partners",
-            headerRight: renderHeaderRight,
-          }}
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Stack.Screen
+        options={{
+          title: "Partners",
+          headerRight: renderHeaderRight,
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+          },
+          headerTintColor: theme.colors.text,
+          headerTitleStyle: {
+            fontWeight: '600',
+          },
+        }}
+      />
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        {renderStats()}
+
+        {/* Partners Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Your Partners
+          </Text>
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+                Loading partners...
+              </Text>
+            </View>
+          ) : partners.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <IconSymbol name="person.2" size={48} color={theme.colors.text} />
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                No partners yet
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+                Invite partners to collaborate on tasks
+              </Text>
+            </View>
+          ) : (
+            partners.map((partner) => (
+              <PartnerCard
+                key={partner.id}
+                partner={partner}
+                onAccept={partner.status === 'pending' ? () => handleAcceptPartner(partner.id) : undefined}
+                onDecline={partner.status === 'pending' ? () => handleDeclinePartner(partner.id) : undefined}
+                onPress={partner.status === 'accepted' ? () => {
+                  setSelectedPartnerId(partner.id);
+                  setShowCreateTaskModal(true);
+                } : undefined}
+              />
+            ))
+          )}
+        </View>
+
+        {/* Partner Tasks Section */}
+        {partners.filter(p => p.status === 'accepted').map((partner) => {
+          const partnerTasks = getTasksForPartner(partner.id);
+          
+          if (partnerTasks.length === 0) return null;
+
+          return (
+            <View key={`tasks-${partner.id}`} style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                Tasks with {partner.name}
+              </Text>
+              
+              {partnerTasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  partners={partners}
+                  onToggleComplete={handleToggleTask}
+                  onToggleSubTask={handleToggleSubTask}
+                  onPress={() => {
+                    console.log('Task pressed:', task.title);
+                    // TODO: Navigate to task detail
+                  }}
+                  onShare={() => {
+                    console.log('Share task:', task.title);
+                    // TODO: Implement share functionality
+                  }}
+                />
+              ))}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      <Modal
+        visible={showInviteModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <InvitePartnerModal
+          onClose={() => setShowInviteModal(false)}
+          onInvite={handleInvitePartner}
         />
-      )}
-      
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[
-            styles.content,
-            Platform.OS !== 'ios' && styles.contentWithTabBar,
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.colors.primary}
-            />
-          }
-        >
-          {/* Header for non-iOS platforms */}
-          {Platform.OS !== 'ios' && (
-            <View style={styles.header}>
-              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-                Partners
-              </Text>
-              {renderHeaderRight()}
-            </View>
-          )}
+      </Modal>
 
-          {/* Stats */}
-          {renderStats()}
-
-          {/* Welcome message for new users */}
-          {partners.length === 0 && (
-            <GlassView
-              style={[
-                styles.welcomeContainer,
-                Platform.OS !== 'ios' && {
-                  backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                },
-              ]}
-              glassEffectStyle="regular"
-            >
-              <IconSymbol name="person.2.fill" size={48} color={theme.colors.primary} />
-              <Text style={[styles.welcomeTitle, { color: theme.colors.text }]}>
-                Collaborate with Partners
-              </Text>
-              <Text style={[styles.welcomeText, { color: theme.dark ? '#98989D' : '#666' }]}>
-                Invite partners to share tasks, create tasks for each other, and collaborate on projects together.
-              </Text>
-              <Pressable
-                onPress={() => setShowInviteModal(true)}
-                style={[styles.welcomeButton, { backgroundColor: theme.colors.primary }]}
-              >
-                <IconSymbol name="person.badge.plus" size={16} color="white" />
-                <Text style={styles.welcomeButtonText}>Invite Partner</Text>
-              </Pressable>
-            </GlassView>
-          )}
-
-          {/* Pending Partners */}
-          {pendingPartners.length > 0 && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Pending Invitations ({pendingPartners.length})
-              </Text>
-              {pendingPartners.map((partner) => (
-                <PartnerCard
-                  key={partner.id}
-                  partner={partner}
-                  onAccept={() => handleAcceptPartner(partner.id)}
-                  onDecline={() => handleDeclinePartner(partner.id)}
-                />
-              ))}
-            </View>
-          )}
-
-          {/* Active Partners */}
-          {acceptedPartners.length > 0 && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Active Partners ({acceptedPartners.length})
-              </Text>
-              {acceptedPartners.map((partner) => {
-                const partnerTasks = getTasksForPartner(partner.id);
-                return (
-                  <View key={partner.id} style={styles.partnerSection}>
-                    <PartnerCard
-                      partner={partner}
-                      onPress={() => console.log('Partner pressed:', partner.id)}
-                    />
-                    
-                    <View style={styles.partnerActions}>
-                      <Pressable
-                        onPress={() => {
-                          setSelectedPartner(partner.id);
-                          setShowCreateTaskModal(true);
-                        }}
-                        style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
-                      >
-                        <IconSymbol name="plus" size={16} color="white" />
-                        <Text style={styles.actionButtonText}>Create Task</Text>
-                      </Pressable>
-                      
-                      <Text style={[styles.taskCount, { color: theme.dark ? '#98989D' : '#666' }]}>
-                        {partnerTasks.length} shared tasks
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          {/* Declined Partners */}
-          {declinedPartners.length > 0 && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Declined ({declinedPartners.length})
-              </Text>
-              {declinedPartners.map((partner) => (
-                <PartnerCard
-                  key={partner.id}
-                  partner={partner}
-                />
-              ))}
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Invite Partner Modal */}
-        <Modal
-          visible={showInviteModal}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <InvitePartnerModal
-            onClose={() => setShowInviteModal(false)}
-            onInvite={handleInvitePartner}
-          />
-        </Modal>
-
-        {/* Create Task for Partner Modal */}
-        <Modal
-          visible={showCreateTaskModal}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <CreateTaskForPartnerModal
-            onClose={() => {
-              setShowCreateTaskModal(false);
-              setSelectedPartner(null);
-            }}
-            onCreateTask={handleCreateTaskForPartner}
-            partnerId={selectedPartner}
-            partnerName={acceptedPartners.find(p => p.id === selectedPartner)?.name || ''}
-          />
-        </Modal>
-      </SafeAreaView>
-    </>
+      <Modal
+        visible={showCreateTaskModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <CreateTaskForPartnerModal
+          onClose={() => {
+            setShowCreateTaskModal(false);
+            setSelectedPartnerId(null);
+          }}
+          onCreateTask={handleCreateTaskForPartner}
+          partnerId={selectedPartnerId}
+          partnerName={partners.find(p => p.id === selectedPartnerId)?.name || ''}
+        />
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -321,34 +302,30 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  content: {
+  scrollContent: {
     padding: 16,
-  },
-  contentWithTabBar: {
-    paddingBottom: 100,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+    paddingBottom: 100, // Space for floating tab bar
   },
   headerButton: {
-    padding: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statsContainer: {
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
   },
-  statItem: {
+  statCard: {
+    flex: 1,
+    minWidth: 80,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
+    backgroundColor: Platform.OS === 'ios' ? undefined : 'rgba(255,255,255,0.1)',
   },
   statNumber: {
     fontSize: 24,
@@ -357,78 +334,38 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  welcomeContainer: {
-    borderRadius: 12,
-    padding: 32,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  welcomeTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: 16,
-    marginBottom: 8,
+    fontWeight: '500',
     textAlign: 'center',
-  },
-  welcomeText: {
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  welcomeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  welcomeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
   },
   section: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    marginBottom: 12,
-  },
-  partnerSection: {
     marginBottom: 16,
   },
-  partnerActions: {
-    flexDirection: 'row',
+  loadingContainer: {
+    padding: 32,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingHorizontal: 16,
   },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    gap: 6,
-  },
-  actionButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'white',
-  },
-  taskCount: {
-    fontSize: 12,
+  loadingText: {
+    fontSize: 16,
     fontWeight: '500',
+  },
+  emptyContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

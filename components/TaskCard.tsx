@@ -8,13 +8,14 @@ import {
 } from 'react-native';
 import React from 'react';
 import * as Haptics from 'expo-haptics';
-import { Task } from '@/types/Task';
+import { Task, Partner } from '@/types/Task';
 import { GlassView } from 'expo-glass-effect';
 import { IconSymbol } from './IconSymbol';
 import { useTheme } from '@react-navigation/native';
 
 interface TaskCardProps {
   task: Task;
+  partners: Partner[];
   onToggleComplete: (taskId: string) => void;
   onPress: () => void;
   onShare?: () => void;
@@ -23,6 +24,7 @@ interface TaskCardProps {
 
 export default function TaskCard({ 
   task, 
+  partners,
   onToggleComplete, 
   onPress, 
   onShare,
@@ -63,9 +65,23 @@ export default function TaskCard({
     });
   };
 
+  const getSharedPartners = () => {
+    return partners.filter(partner => 
+      task.sharedWith.includes(partner.id) && partner.status === 'accepted'
+    );
+  };
+
+  const getAssignedPartner = () => {
+    if (!task.assignedTo) return null;
+    return partners.find(partner => partner.id === task.assignedTo);
+  };
+
   const completedSubTasks = task.subTasks.filter(st => st.completed).length;
   const totalSubTasks = task.subTasks.length;
   const progressPercentage = totalSubTasks > 0 ? (completedSubTasks / totalSubTasks) * 100 : 0;
+
+  const sharedPartners = getSharedPartners();
+  const assignedPartner = getAssignedPartner();
 
   return (
     <GlassView
@@ -115,6 +131,51 @@ export default function TaskCard({
               </Text>
             )}
 
+            {/* Show assigned partner */}
+            {assignedPartner && (
+              <View style={styles.assignedContainer}>
+                <IconSymbol name="person.fill" size={12} color="#FF9500" />
+                <Text style={[styles.assignedText, { color: '#FF9500' }]}>
+                  Assigned to {assignedPartner.name}
+                </Text>
+              </View>
+            )}
+
+            {/* Show shared partners */}
+            {sharedPartners.length > 0 && (
+              <View style={styles.sharedPartnersContainer}>
+                <View style={styles.sharedHeader}>
+                  <IconSymbol name="person.2.fill" size={12} color={theme.colors.primary} />
+                  <Text style={[styles.sharedHeaderText, { color: theme.colors.primary }]}>
+                    Shared with:
+                  </Text>
+                </View>
+                <View style={styles.partnersList}>
+                  {sharedPartners.slice(0, 3).map((partner, index) => (
+                    <View key={partner.id} style={styles.partnerItem}>
+                      <View style={[styles.partnerAvatar, { backgroundColor: theme.colors.primary }]}>
+                        <Text style={styles.partnerInitial}>
+                          {partner.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={[styles.partnerName, { color: theme.colors.text }]} numberOfLines={1}>
+                        {partner.name}
+                      </Text>
+                    </View>
+                  ))}
+                  {sharedPartners.length > 3 && (
+                    <View style={styles.morePartnersContainer}>
+                      <View style={[styles.morePartnersCircle, { backgroundColor: theme.dark ? '#333' : '#E5E5E7' }]}>
+                        <Text style={[styles.morePartnersText, { color: theme.colors.text }]}>
+                          +{sharedPartners.length - 3}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
             <View style={styles.metadata}>
               <View style={styles.metadataLeft}>
                 <View
@@ -133,15 +194,6 @@ export default function TaskCard({
                     <IconSymbol name="list.bullet" size={12} color={theme.colors.text} />
                     <Text style={[styles.progressText, { color: theme.colors.text }]}>
                       {completedSubTasks}/{totalSubTasks}
-                    </Text>
-                  </View>
-                )}
-
-                {task.sharedWith.length > 0 && (
-                  <View style={styles.sharedIndicator}>
-                    <IconSymbol name="person.2.fill" size={12} color={theme.colors.primary} />
-                    <Text style={[styles.sharedText, { color: theme.colors.primary }]}>
-                      Shared
                     </Text>
                   </View>
                 )}
@@ -256,6 +308,79 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
+  assignedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+  },
+  assignedText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sharedPartnersContainer: {
+    marginBottom: 12,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  sharedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+  },
+  sharedHeaderText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  partnersList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  partnerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    maxWidth: 120,
+  },
+  partnerAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  partnerInitial: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'white',
+  },
+  partnerName: {
+    fontSize: 11,
+    fontWeight: '500',
+    flex: 1,
+  },
+  morePartnersContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  morePartnersCircle: {
+    width: 28,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  morePartnersText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
   metadata: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -288,15 +413,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   progressText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  sharedIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  sharedText: {
     fontSize: 12,
     fontWeight: '600',
   },
