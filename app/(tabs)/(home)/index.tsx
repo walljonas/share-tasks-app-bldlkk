@@ -4,7 +4,7 @@ import { useTasks } from "@/hooks/useTasks";
 import { useTheme } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { IconSymbol } from "@/components/IconSymbol";
-import InvitePartnerModal from "@/components/InvitePartnerModal";
+import InviteAllyModal from "@/components/InviteAllyModal";
 import { 
   ScrollView, 
   StyleSheet, 
@@ -15,52 +15,53 @@ import {
   Modal,
   RefreshControl,
 } from "react-native";
-import CreateTaskModal from "@/components/CreateTaskModal";
+import CreateQuestModal from "@/components/CreateQuestModal";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import TaskCard from "@/components/TaskCard";
+import QuestCard from "@/components/QuestCard";
+import { colors } from "@/styles/commonStyles";
 
-export default function HomeScreen() {
+export default function QuestBoardScreen() {
   const theme = useTheme();
   const { 
-    tasks, 
-    partners,
+    tasks: quests, 
+    partners: allies,
     loading, 
-    createTask, 
-    updateTask, 
-    updateSubTask,
-    invitePartner 
+    createTask: createQuest, 
+    updateTask: updateQuest, 
+    updateSubTask: updateSubQuest,
+    invitePartner: inviteAlly 
   } = useTasks();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleToggleTask = async (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      await updateTask(taskId, { completed: !task.completed });
+  const handleToggleQuest = async (questId: string) => {
+    const quest = quests.find(q => q.id === questId);
+    if (quest) {
+      await updateQuest(questId, { completed: !quest.completed });
     }
   };
 
-  const handleToggleSubTask = async (taskId: string, subTaskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      const subTask = task.subTasks.find(st => st.id === subTaskId);
-      if (subTask) {
-        await updateSubTask(taskId, subTaskId, { completed: !subTask.completed });
+  const handleToggleSubQuest = async (questId: string, subQuestId: string) => {
+    const quest = quests.find(q => q.id === questId);
+    if (quest) {
+      const subQuest = quest.subTasks.find(sq => sq.id === subQuestId);
+      if (subQuest) {
+        await updateSubQuest(questId, subQuestId, { completed: !subQuest.completed });
       }
     }
   };
 
-  const handleCreateTask = async (taskData: any) => {
-    await createTask(taskData);
+  const handleCreateQuest = async (questData: any) => {
+    await createQuest(questData);
     setShowCreateModal(false);
   };
 
-  const handleInvitePartner = async (email: string, name: string) => {
-    await invitePartner(email, name);
+  const handleInviteAlly = async (email: string, name: string) => {
+    await inviteAlly(email, name);
     setShowInviteModal(false);
   };
 
@@ -79,7 +80,7 @@ export default function HomeScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setShowInviteModal(true);
         }}
-        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+        style={[styles.headerButton, { backgroundColor: colors.primary }]}
       >
         <IconSymbol name="person.badge.plus" size={16} color="white" />
       </Pressable>
@@ -88,7 +89,7 @@ export default function HomeScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setShowCreateModal(true);
         }}
-        style={[styles.headerButton, { backgroundColor: theme.colors.primary }]}
+        style={[styles.headerButton, { backgroundColor: colors.success }]}
       >
         <IconSymbol name="plus" size={16} color="white" />
       </Pressable>
@@ -96,74 +97,181 @@ export default function HomeScreen() {
   );
 
   const renderStats = () => {
-    const completedTasks = tasks.filter(task => task.completed).length;
-    const totalTasks = tasks.length;
-    const pendingTasks = totalTasks - completedTasks;
-    const sharedTasks = tasks.filter(task => task.sharedWith.length > 0).length;
-    const assignedTasks = tasks.filter(task => task.assignedTo).length;
+    const completedQuests = quests.filter(quest => quest.completed).length;
+    const totalQuests = quests.length;
+    const activeQuests = totalQuests - completedQuests;
+    const sharedQuests = quests.filter(quest => quest.sharedWith.length > 0).length;
+    const totalXp = quests.reduce((total, quest) => total + (quest.xpReward || 0), 0);
+    const earnedXp = quests
+      .filter(quest => quest.completed)
+      .reduce((total, quest) => total + (quest.xpReward || 0), 0);
 
     return (
       <View style={styles.statsContainer}>
         <GlassView style={styles.statCard} glassEffectStyle="regular">
-          <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
-            {totalTasks}
+          <View style={styles.statIcon}>
+            <IconSymbol name="star.fill" size={20} color={colors.warning} />
+          </View>
+          <Text style={[styles.statNumber, { color: colors.warning }]}>
+            {earnedXp}
           </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
-            Total Tasks
+          <Text style={[styles.statLabel, { color: colors.text }]}>
+            XP Earned
           </Text>
         </GlassView>
 
         <GlassView style={styles.statCard} glassEffectStyle="regular">
-          <Text style={[styles.statNumber, { color: '#34C759' }]}>
-            {completedTasks}
+          <View style={styles.statIcon}>
+            <IconSymbol name="flag.fill" size={20} color={colors.success} />
+          </View>
+          <Text style={[styles.statNumber, { color: colors.success }]}>
+            {completedQuests}
           </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+          <Text style={[styles.statLabel, { color: colors.text }]}>
             Completed
           </Text>
         </GlassView>
 
         <GlassView style={styles.statCard} glassEffectStyle="regular">
-          <Text style={[styles.statNumber, { color: '#FF9500' }]}>
-            {pendingTasks}
+          <View style={styles.statIcon}>
+            <IconSymbol name="flame.fill" size={20} color={colors.primary} />
+          </View>
+          <Text style={[styles.statNumber, { color: colors.primary }]}>
+            {activeQuests}
           </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
-            Pending
+          <Text style={[styles.statLabel, { color: colors.text }]}>
+            Active
           </Text>
         </GlassView>
 
         <GlassView style={styles.statCard} glassEffectStyle="regular">
-          <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
-            {sharedTasks}
+          <View style={styles.statIcon}>
+            <IconSymbol name="person.2.fill" size={20} color={colors.accent} />
+          </View>
+          <Text style={[styles.statNumber, { color: colors.accent }]}>
+            {sharedQuests}
           </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
+          <Text style={[styles.statLabel, { color: colors.text }]}>
             Shared
-          </Text>
-        </GlassView>
-
-        <GlassView style={styles.statCard} glassEffectStyle="regular">
-          <Text style={[styles.statNumber, { color: '#FF3B30' }]}>
-            {assignedTasks}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.text }]}>
-            Assigned
           </Text>
         </GlassView>
       </View>
     );
   };
 
+  const renderQuestsByDifficulty = () => {
+    const questsByDifficulty = {
+      legendary: quests.filter(q => q.difficulty === 'legendary' && !q.completed),
+      hard: quests.filter(q => q.difficulty === 'hard' && !q.completed),
+      medium: quests.filter(q => q.difficulty === 'medium' && !q.completed),
+      easy: quests.filter(q => q.difficulty === 'easy' && !q.completed),
+    };
+
+    const completedQuests = quests.filter(q => q.completed);
+
+    return (
+      <View style={styles.questsSection}>
+        {/* Active Quests by Difficulty */}
+        {Object.entries(questsByDifficulty).map(([difficulty, questList]) => {
+          if (questList.length === 0) return null;
+          
+          const difficultyConfig = getDifficultyConfig(difficulty);
+          
+          return (
+            <View key={difficulty} style={styles.difficultySection}>
+              <View style={styles.difficultySectionHeader}>
+                <IconSymbol name={difficultyConfig.icon} size={20} color={difficultyConfig.color} />
+                <Text style={[styles.difficultySectionTitle, { color: difficultyConfig.color }]}>
+                  {difficultyConfig.label} QUESTS ({questList.length})
+                </Text>
+              </View>
+              
+              {questList.map((quest) => (
+                <QuestCard
+                  key={quest.id}
+                  quest={quest}
+                  allies={allies}
+                  onToggleComplete={handleToggleQuest}
+                  onToggleSubQuest={handleToggleSubQuest}
+                  onPress={() => {
+                    console.log('Quest pressed:', quest.title);
+                    // TODO: Navigate to quest detail
+                  }}
+                  onShare={() => {
+                    console.log('Share quest:', quest.title);
+                    // TODO: Implement share functionality
+                  }}
+                />
+              ))}
+            </View>
+          );
+        })}
+
+        {/* Completed Quests */}
+        {completedQuests.length > 0 && (
+          <View style={styles.difficultySection}>
+            <View style={styles.difficultySectionHeader}>
+              <IconSymbol name="checkmark.circle.fill" size={20} color={colors.success} />
+              <Text style={[styles.difficultySectionTitle, { color: colors.success }]}>
+                COMPLETED QUESTS ({completedQuests.length})
+              </Text>
+            </View>
+            
+            {completedQuests.slice(0, 5).map((quest) => (
+              <QuestCard
+                key={quest.id}
+                quest={quest}
+                allies={allies}
+                onToggleComplete={handleToggleQuest}
+                onToggleSubQuest={handleToggleSubQuest}
+                onPress={() => {
+                  console.log('Quest pressed:', quest.title);
+                }}
+                onShare={() => {
+                  console.log('Share quest:', quest.title);
+                }}
+              />
+            ))}
+            
+            {completedQuests.length > 5 && (
+              <Text style={[styles.moreQuestsText, { color: colors.textSecondary }]}>
+                +{completedQuests.length - 5} more completed quests
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const getDifficultyConfig = (difficulty: string) => {
+    switch (difficulty) {
+      case 'legendary':
+        return { color: '#F59E0B', icon: 'crown.fill', label: 'LEGENDARY' };
+      case 'hard':
+        return { color: '#EF4444', icon: 'flame.fill', label: 'HARD' };
+      case 'medium':
+        return { color: '#8B5CF6', icon: 'bolt.fill', label: 'MEDIUM' };
+      case 'easy':
+        return { color: '#10B981', icon: 'leaf.fill', label: 'EASY' };
+      default:
+        return { color: colors.primary, icon: 'circle.fill', label: 'UNKNOWN' };
+    }
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen
         options={{
-          title: "Tasks",
+          title: "Quest Board",
           headerRight: renderHeaderRight,
           headerStyle: {
-            backgroundColor: theme.colors.background,
+            backgroundColor: colors.background,
           },
-          headerTintColor: theme.colors.text,
+          headerTintColor: colors.text,
           headerTitleStyle: {
-            fontWeight: '600',
+            fontWeight: '700',
+            fontSize: 18,
           },
         }}
       />
@@ -175,53 +283,43 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
+            tintColor={colors.primary}
           />
         }
       >
         {renderStats()}
 
-        <View style={styles.tasksSection}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Your Tasks
-          </Text>
-
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={[styles.loadingText, { color: theme.colors.text }]}>
-                Loading tasks...
-              </Text>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <View style={styles.loadingIcon}>
+              <IconSymbol name="sparkles" size={48} color={colors.primary} />
             </View>
-          ) : tasks.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol name="checkmark.circle" size={48} color={theme.colors.text} />
-              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                No tasks yet
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
-                Create your first task to get started
-              </Text>
+            <Text style={[styles.loadingText, { color: colors.text }]}>
+              Loading your quests...
+            </Text>
+          </View>
+        ) : quests.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIcon}>
+              <IconSymbol name="map" size={64} color={colors.primary} />
             </View>
-          ) : (
-            tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                partners={partners}
-                onToggleComplete={handleToggleTask}
-                onToggleSubTask={handleToggleSubTask}
-                onPress={() => {
-                  console.log('Task pressed:', task.title);
-                  // TODO: Navigate to task detail
-                }}
-                onShare={() => {
-                  console.log('Share task:', task.title);
-                  // TODO: Implement share functionality
-                }}
-              />
-            ))
-          )}
-        </View>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              Your Quest Board Awaits
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+              Begin your adventure by creating your first quest
+            </Text>
+            <Pressable
+              onPress={() => setShowCreateModal(true)}
+              style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+            >
+              <IconSymbol name="plus" size={20} color="white" />
+              <Text style={styles.emptyButtonText}>Start Your First Quest</Text>
+            </Pressable>
+          </View>
+        ) : (
+          renderQuestsByDifficulty()
+        )}
       </ScrollView>
 
       <Modal
@@ -229,10 +327,10 @@ export default function HomeScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <CreateTaskModal
+        <CreateQuestModal
           onClose={() => setShowCreateModal(false)}
-          onCreateTask={handleCreateTask}
-          partners={partners.filter(p => p.status === 'accepted')}
+          onCreateQuest={handleCreateQuest}
+          allies={allies.filter(a => a.status === 'allied')}
         />
       </Modal>
 
@@ -241,9 +339,9 @@ export default function HomeScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <InvitePartnerModal
+        <InviteAllyModal
           onClose={() => setShowInviteModal(false)}
-          onInvite={handleInvitePartner}
+          onInvite={handleInviteAlly}
         />
       </Modal>
     </SafeAreaView>
@@ -266,9 +364,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -282,49 +380,90 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 80,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
-    backgroundColor: Platform.OS === 'ios' ? undefined : 'rgba(255,255,255,0.1)',
+    backgroundColor: Platform.OS === 'ios' ? undefined : colors.surface,
+  },
+  statIcon: {
+    marginBottom: 8,
   },
   statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
+    fontWeight: '600',
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  tasksSection: {
+  questsSection: {
     flex: 1,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
+  difficultySection: {
+    marginBottom: 24,
+  },
+  difficultySectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  difficultySectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  moreQuestsText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 8,
   },
   loadingContainer: {
-    padding: 32,
+    padding: 48,
     alignItems: 'center',
+  },
+  loadingIcon: {
+    marginBottom: 16,
   },
   loadingText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   emptyContainer: {
-    padding: 32,
+    padding: 48,
     alignItems: 'center',
   },
+  emptyIcon: {
+    marginBottom: 24,
+  },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
+  emptyButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
   },
 });

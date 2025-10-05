@@ -1,67 +1,84 @@
 
+import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
-import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
-import { Stack } from 'expo-router';
-import FloatingTabBar, { TabBarItem } from '@/components/FloatingTabBar';
+import { HapticTab } from '@/components/HapticTab';
+import { IconSymbol } from '@/components/IconSymbol';
+import TabBarBackground from '@/components/ui/TabBarBackground';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import FloatingTabBar from '@/components/FloatingTabBar';
+import { colors } from '@/styles/commonStyles';
 
 export default function TabLayout() {
-  // Define the tabs configuration
-  const tabs: TabBarItem[] = [
+  const colorScheme = useColorScheme();
+
+  const tabs = [
     {
       name: '(home)',
-      route: '/(tabs)/(home)/',
-      icon: 'house.fill',
-      label: 'Home',
+      title: 'Quest Board',
+      icon: 'map',
+      route: '/(home)',
     },
     {
-      name: 'partners',
-      route: '/(tabs)/partners',
+      name: 'allies',
+      title: 'Allies',
       icon: 'person.2.fill',
-      label: 'Partners',
+      route: '/allies',
     },
     {
       name: 'profile',
-      route: '/(tabs)/profile',
-      icon: 'person.fill',
-      label: 'Profile',
+      title: 'Profile',
+      icon: 'person.circle',
+      route: '/profile',
     },
   ];
 
-  // Use NativeTabs for iOS, custom FloatingTabBar for Android and Web
-  if (Platform.OS === 'ios') {
-    return (
-      <NativeTabs>
-        <NativeTabs.Trigger name="(home)">
-          <Icon sf="house.fill" drawable="ic_home" />
-          <Label>Home</Label>
-        </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="partners">
-          <Icon sf="person.2.fill" drawable="ic_partners" />
-          <Label>Partners</Label>
-        </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="profile">
-          <Icon sf="person.fill" drawable="ic_profile" />
-          <Label>Profile</Label>
-        </NativeTabs.Trigger>
-      </NativeTabs>
-    );
-  }
-
-  // For Android and Web, use Stack navigation with custom floating tab bar
   return (
     <>
-      <Stack
+      <Tabs
         screenOptions={{
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.textSecondary,
           headerShown: false,
-          animation: 'none', // Remove fade animation to prevent black screen flash
+          tabBarButton: HapticTab,
+          tabBarBackground: TabBarBackground,
+          tabBarStyle: Platform.select({
+            ios: {
+              position: 'absolute',
+              backgroundColor: 'transparent',
+            },
+            default: {
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
+            },
+          }),
         }}
       >
-        <Stack.Screen name="(home)" />
-        <Stack.Screen name="partners" />
-        <Stack.Screen name="profile" />
-      </Stack>
-      <FloatingTabBar tabs={tabs} />
+        <Tabs.Screen
+          name="(home)"
+          options={{
+            title: 'Quest Board',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="map" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="allies"
+          options={{
+            title: 'Allies',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.2.fill" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.circle" color={color} />,
+          }}
+        />
+      </Tabs>
+      
+      {Platform.OS === 'ios' && <FloatingTabBar tabs={tabs} />}
     </>
   );
 }
