@@ -1,4 +1,12 @@
 
+export interface SubTask {
+  id: string;
+  title: string;
+  completed: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -13,6 +21,8 @@ export interface Task {
   tags: string[];
   collaborators: string[];
   sharedWith: string[];
+  subTasks: SubTask[];
+  isChecklist: boolean;
 }
 
 export interface Partner {

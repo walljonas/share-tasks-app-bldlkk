@@ -14,23 +14,28 @@ import {
 import { useTheme } from '@react-navigation/native';
 import { IconSymbol } from './IconSymbol';
 import { GlassView } from 'expo-glass-effect';
-import { Task, Partner, SubTask } from '@/types/Task';
+import { Task, SubTask } from '@/types/Task';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-interface CreateTaskModalProps {
+interface CreateTaskForPartnerModalProps {
   onClose: () => void;
-  onCreateTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  partners: Partner[];
+  onCreateTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'assignedTo'>) => void;
+  partnerId: string | null;
+  partnerName: string;
 }
 
-export default function CreateTaskModal({ onClose, onCreateTask, partners }: CreateTaskModalProps) {
+export default function CreateTaskForPartnerModal({ 
+  onClose, 
+  onCreateTask, 
+  partnerId, 
+  partnerName 
+}: CreateTaskForPartnerModalProps) {
   const theme = useTheme();
   const colorScheme = useColorScheme();
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
-  const [selectedPartners, setSelectedPartners] = useState<string[]>([]);
   const [isChecklist, setIsChecklist] = useState(false);
   const [subTasks, setSubTasks] = useState<Omit<SubTask, 'id' | 'createdAt' | 'updatedAt'>[]>([]);
   const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
@@ -41,6 +46,11 @@ export default function CreateTaskModal({ onClose, onCreateTask, partners }: Cre
       return;
     }
 
+    if (!partnerId) {
+      Alert.alert('Error', 'No partner selected');
+      return;
+    }
+
     const finalSubTasks: SubTask[] = subTasks.map((subTask, index) => ({
       ...subTask,
       id: `${Date.now()}-${index}`,
@@ -48,29 +58,21 @@ export default function CreateTaskModal({ onClose, onCreateTask, partners }: Cre
       updatedAt: new Date(),
     }));
 
-    const newTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
+    const newTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'assignedTo'> = {
       title: title.trim(),
       description: description.trim() || undefined,
       completed: false,
       priority,
-      createdBy: 'current-user', // In a real app, this would be the current user ID
+      createdBy: 'current-user',
       tags: [],
-      collaborators: selectedPartners,
-      sharedWith: selectedPartners,
+      collaborators: [partnerId],
+      sharedWith: [partnerId],
       subTasks: finalSubTasks,
       isChecklist,
     };
 
     onCreateTask(newTask);
     onClose();
-  };
-
-  const togglePartner = (partnerId: string) => {
-    setSelectedPartners(prev =>
-      prev.includes(partnerId)
-        ? prev.filter(id => id !== partnerId)
-        : [...prev, partnerId]
-    );
   };
 
   const addSubTask = () => {
@@ -112,15 +114,15 @@ export default function CreateTaskModal({ onClose, onCreateTask, partners }: Cre
     }
   };
 
-  const acceptedPartners = partners.filter(p => p.status === 'accepted');
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <Pressable onPress={onClose} style={styles.closeButton}>
           <IconSymbol name="xmark" size={24} color={theme.colors.text} />
         </Pressable>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Create Task</Text>
+        <Text style={[styles.title, { color: theme.colors.text }]}>
+          Create Task for {partnerName}
+        </Text>
         <Pressable onPress={handleCreate} style={styles.createButton}>
           <Text style={[styles.createButtonText, { color: theme.colors.primary }]}>Create</Text>
         </Pressable>
@@ -297,50 +299,6 @@ export default function CreateTaskModal({ onClose, onCreateTask, partners }: Cre
             </>
           )}
         </GlassView>
-
-        {acceptedPartners.length > 0 && (
-          <GlassView
-            style={[
-              styles.section,
-              colorScheme !== 'ios' && {
-                backgroundColor: theme.dark
-                  ? 'rgba(255,255,255,0.1)'
-                  : 'rgba(0,0,0,0.05)',
-              },
-            ]}
-            glassEffectStyle="regular"
-          >
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Share with Partners
-            </Text>
-            
-            {acceptedPartners.map((partner) => (
-              <Pressable
-                key={partner.id}
-                onPress={() => togglePartner(partner.id)}
-                style={styles.partnerItem}
-              >
-                <View style={styles.partnerInfo}>
-                  <IconSymbol name="person.circle.fill" size={32} color={theme.colors.primary} />
-                  <View style={styles.partnerDetails}>
-                    <Text style={[styles.partnerName, { color: theme.colors.text }]}>
-                      {partner.name}
-                    </Text>
-                    <Text style={[styles.partnerEmail, { color: theme.dark ? '#98989D' : '#666' }]}>
-                      {partner.email}
-                    </Text>
-                  </View>
-                </View>
-                
-                <IconSymbol
-                  name={selectedPartners.includes(partner.id) ? 'checkmark.circle.fill' : 'circle'}
-                  size={24}
-                  color={selectedPartners.includes(partner.id) ? '#34C759' : theme.colors.text}
-                />
-              </Pressable>
-            ))}
-          </GlassView>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -365,6 +323,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 16,
   },
   createButton: {
     padding: 4,
@@ -462,29 +423,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
     fontStyle: 'italic',
-  },
-  partnerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  partnerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  partnerDetails: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  partnerName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  partnerEmail: {
-    fontSize: 14,
   },
 });

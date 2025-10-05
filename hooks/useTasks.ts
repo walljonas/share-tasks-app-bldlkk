@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Task, TaskList, Partner } from '@/types/Task';
+import { Task, TaskList, Partner, SubTask } from '@/types/Task';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TASKS_STORAGE_KEY = '@tasks';
@@ -26,7 +26,16 @@ export const useTasks = () => {
         AsyncStorage.getItem(TASK_LISTS_STORAGE_KEY),
       ]);
 
-      if (tasksData) setTasks(JSON.parse(tasksData));
+      if (tasksData) {
+        const parsedTasks = JSON.parse(tasksData);
+        // Ensure backward compatibility for tasks without subTasks
+        const migratedTasks = parsedTasks.map((task: any) => ({
+          ...task,
+          subTasks: task.subTasks || [],
+          isChecklist: task.isChecklist || false,
+        }));
+        setTasks(migratedTasks);
+      }
       if (partnersData) setPartners(JSON.parse(partnersData));
       if (taskListsData) setTaskLists(JSON.parse(taskListsData));
     } catch (error) {
@@ -62,6 +71,8 @@ export const useTasks = () => {
       id: Date.now().toString(),
       createdAt: new Date(),
       updatedAt: new Date(),
+      subTasks: taskData.subTasks || [],
+      isChecklist: taskData.isChecklist || false,
     };
 
     const updatedTasks = [...tasks, newTask];
@@ -82,6 +93,61 @@ export const useTasks = () => {
 
   const deleteTask = async (taskId: string) => {
     const updatedTasks = tasks.filter(task => task.id !== taskId);
+    setTasks(updatedTasks);
+    await saveData(updatedTasks);
+  };
+
+  const addSubTask = async (taskId: string, subTaskTitle: string) => {
+    const newSubTask: SubTask = {
+      id: Date.now().toString(),
+      title: subTaskTitle,
+      completed: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const updatedTasks = tasks.map(task =>
+      task.id === taskId
+        ? {
+            ...task,
+            subTasks: [...task.subTasks, newSubTask],
+            updatedAt: new Date(),
+          }
+        : task
+    );
+    setTasks(updatedTasks);
+    await saveData(updatedTasks);
+    return newSubTask;
+  };
+
+  const updateSubTask = async (taskId: string, subTaskId: string, updates: Partial<SubTask>) => {
+    const updatedTasks = tasks.map(task =>
+      task.id === taskId
+        ? {
+            ...task,
+            subTasks: task.subTasks.map(subTask =>
+              subTask.id === subTaskId
+                ? { ...subTask, ...updates, updatedAt: new Date() }
+                : subTask
+            ),
+            updatedAt: new Date(),
+          }
+        : task
+    );
+    setTasks(updatedTasks);
+    await saveData(updatedTasks);
+  };
+
+  const deleteSubTask = async (taskId: string, subTaskId: string) => {
+    const updatedTasks = tasks.map(task =>
+      task.id === taskId
+        ? {
+            ...task,
+            subTasks: task.subTasks.filter(subTask => subTask.id !== subTaskId),
+            updatedAt: new Date(),
+          }
+        : task
+    );
     setTasks(updatedTasks);
     await saveData(updatedTasks);
   };
@@ -141,6 +207,26 @@ export const useTasks = () => {
     await saveData(updatedTasks);
   };
 
+  const createTaskForPartner = async (partnerId: string, taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'assignedTo'>) => {
+    const partner = partners.find(p => p.id === partnerId);
+    if (!partner) return;
+
+    const newTask: Task = {
+      ...taskData,
+      id: Date.now().toString(),
+      assignedTo: partnerId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      subTasks: taskData.subTasks || [],
+      isChecklist: taskData.isChecklist || false,
+    };
+
+    const updatedTasks = [...tasks, newTask];
+    setTasks(updatedTasks);
+    await saveData(updatedTasks);
+    return newTask;
+  };
+
   return {
     tasks,
     taskLists,
@@ -149,9 +235,13 @@ export const useTasks = () => {
     createTask,
     updateTask,
     deleteTask,
+    addSubTask,
+    updateSubTask,
+    deleteSubTask,
     createTaskList,
     invitePartner,
     updatePartnerStatus,
     shareTaskWithPartner,
+    createTaskForPartner,
   };
 };

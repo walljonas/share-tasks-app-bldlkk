@@ -29,6 +29,7 @@ export default function HomeScreen() {
     loading,
     createTask,
     updateTask,
+    updateSubTask,
     invitePartner,
     shareTaskWithPartner,
   } = useTasks();
@@ -41,6 +42,14 @@ export default function HomeScreen() {
     const task = tasks.find(t => t.id === taskId);
     if (task) {
       await updateTask(taskId, { completed: !task.completed });
+    }
+  };
+
+  const handleToggleSubTask = async (taskId: string, subTaskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    const subTask = task?.subTasks.find(st => st.id === subTaskId);
+    if (subTask) {
+      await updateSubTask(taskId, subTaskId, { completed: !subTask.completed });
     }
   };
 
@@ -63,6 +72,7 @@ export default function HomeScreen() {
   const completedTasks = tasks.filter(task => task.completed);
   const pendingTasks = tasks.filter(task => !task.completed);
   const acceptedPartners = partners.filter(p => p.status === 'accepted');
+  const checklistTasks = tasks.filter(task => task.isChecklist);
 
   const renderHeaderRight = () => (
     <View style={styles.headerButtons}>
@@ -115,6 +125,17 @@ export default function HomeScreen() {
       
       <View style={styles.statItem}>
         <Text style={[styles.statNumber, { color: '#FF9500' }]}>
+          {checklistTasks.length}
+        </Text>
+        <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
+          Checklists
+        </Text>
+      </View>
+      
+      <View style={styles.statDivider} />
+      
+      <View style={styles.statItem}>
+        <Text style={[styles.statNumber, { color: '#007AFF' }]}>
           {acceptedPartners.length}
         </Text>
         <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
@@ -180,7 +201,7 @@ export default function HomeScreen() {
                 Welcome to Loop Tasks
               </Text>
               <Text style={[styles.welcomeText, { color: theme.dark ? '#98989D' : '#666' }]}>
-                Create your first task or invite partners to start collaborating on shared projects.
+                Create your first task, invite partners to collaborate, or set up checklists to break down complex projects.
               </Text>
               <View style={styles.welcomeButtons}>
                 <Pressable
@@ -214,6 +235,7 @@ export default function HomeScreen() {
                   key={task.id}
                   task={task}
                   onToggleComplete={handleToggleTask}
+                  onToggleSubTask={handleToggleSubTask}
                   onPress={() => console.log('Task pressed:', task.id)}
                   onShare={() => console.log('Share task:', task.id)}
                 />
@@ -232,6 +254,7 @@ export default function HomeScreen() {
                   key={task.id}
                   task={task}
                   onToggleComplete={handleToggleTask}
+                  onToggleSubTask={handleToggleSubTask}
                   onPress={() => console.log('Task pressed:', task.id)}
                 />
               ))}
